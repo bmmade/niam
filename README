@@ -29,7 +29,7 @@ Phase 1:
 Pre-defined PINGS sent over SQS which the client sends to the master
 
 The master will register a PING and will warn if the PING has not been seen in the last
-60 seconds. If the PING has not been seen for 600 seconds then the system is purged from the 
+120 seconds. If the PING has not been seen for 600 seconds then the system is purged from the 
 list of systems and no further warnings will be given.
 
 
@@ -198,13 +198,7 @@ if [ -f /sys/hypervisor/uuid ] && [ `head -c 3 /sys/hypervisor/uuid` == ec2 ]; t
 else
     echo -n NOT-AWS
 fi
-
-
-
 exit 0
-
-
-
 
 
 
@@ -221,10 +215,10 @@ Running NIAM
 -q SQS Queue name   
 
 
-The SQS Queue name will be created as required by niam
+The SQS Queue will be created as required by niam
 
 
-Other switch are possible
+Other switches are possible
 
 -f run in forground
 -d arg   , the greater the arg the more the debug output 1-10, 10-20, 20-100
