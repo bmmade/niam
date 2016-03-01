@@ -13,16 +13,22 @@ safe functionaing of the application.
 What would be good is a non intrusive monitoring system in which not extra ports
 need be opened. Hence NIAM!
 
-We define a master AWS host which accepts message from client AWS nodes via SQS.
+There are a few things to perpare but this document attempts to guide you through
+it.
 
-The master will also make its own check via the aws decribe of visible instances
-and perform analysis of system which have been there and are suddenly missing.
+*******************************************************************************
+
+We define a master AWS host which accepts messages from client AWS nodes via SQS.
+
+The master will also make its own checks via the aws decribe of visible instances
+and perform analysis of systems which have been there and are suddenly missing.
 
 It is in the main coded in the pure language of C.  All calls to SQS and S3 
 encoded in C using low level REST API calls.
 
 Things which have not yet been encoded or simply have to be scripts are in the scripts 
-directory(see below). These may well require the use of the aws cli.
+directory(see below). These may well require the use of the aws cli which must exist 
+in /usr/local/bin  (or wherever you place it and modify the script).
 
 Phase 1:
 
@@ -37,6 +43,8 @@ Phase 2:
 
 Send alerts to an SNS endpoint
 The SNS endpoint should already exist.
+
+See script "Alert"
 
 WE ARE HERE NOW !!!!!!
 
