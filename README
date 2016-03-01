@@ -5,17 +5,20 @@ Non Intrusive Amazon Monitor (NIAM)
 
 Most monitoring systems require a number of ports opened from source to target.
 
-In the Amazon world we require a combination of target ports, VPC peering connection
+In the Amazon world we require a combination of target ports, VPC peering connections
 and routes.
 
 Generally we need to open ICMP and other ports from a monitoring server which is not 
-neccessary to the good nd safe functionaing of the application. 
+neccessary to the good and safe functionaing of the application. 
 
 What would be good is a non intrusive monitoring system. Hence NIAM.
 
 We define a master system which accepts message from client AWS nodes via SQS.
 
 The client sends to the master also via SQS.
+
+The master will also make its own check via the aws decribe of visible instances
+and perform analysis of system which have been there and are suddenly missing.
 
 Phase 1:
 
@@ -35,7 +38,7 @@ Send alerts to a SNS endpoint
 
 Phase 3:
 
-Define other messages from client to master defined by running scrits checks on the client
+Define other messages from client to master defined by running scripted checks on the client
 
 Phase 4:
 
@@ -49,7 +52,7 @@ Make a web inferface
 Installation
 ------------
 
-Download the binary and place in /usr/bin
+Download the binary and place in /usr/sbin
 
 chmod +x /usr/sbin/niam
 
@@ -178,7 +181,7 @@ The SQS Queue name will be created as required by niam
 Other switch are possible
 
 -f run in forground
--d arg   , the egreater the arg the more the debug output 1-10. 10-20, 20-100
+-d arg   , the greater the arg the more the debug output 1-10, 10-20, 20-100
 -c force to be a client  - so you can test master and client from one system
 
 
@@ -195,16 +198,5 @@ Scripts
 
 niam will access the S3 bucket in the scripts directory and download the two named script above into
 the directory /etc/niam/scripts
-
-
-
-
-
-
-
-
-
-
-
 
 
