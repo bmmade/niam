@@ -1,0 +1,210 @@
+
+Non Intrusive Amazon Monitor (NIAM)
+-----------------------------------
+
+
+Most monitoring systems require a number of ports opened from source to target.
+
+In the Amazon world we require a combination of target ports, VPC peering connection
+and routes.
+
+Generally we need to open ICMP and other ports from a monitoring server which is not 
+neccessary to the good nd safe functionaing of the application. 
+
+What would be good is a non intrusive monitoring system. Hence NIAM.
+
+We define a master system which accepts message from client AWS nodes via SQS.
+
+The client sends to the master also via SQS.
+
+Phase 1:
+
+There are pre-defined messages which the client can send to the master
+
+1) PING
+
+The master will register a PING and will warn fo the PING has not been seen in the last
+60 seconds. If the PING has not been seen for 600 seconds then the system is purged from the 
+list of systems and no firther warnings will be given.
+
+
+Phase 2:
+
+Send alerts to a SNS endpoint
+
+
+Phase 3:
+
+Define other messages from client to master defined by running scrits checks on the client
+
+Phase 4:
+
+Log historical data in a Sql database
+
+Phase 5:
+
+Make a web inferface
+
+
+Installation
+------------
+
+Download the binary and place in /usr/bin
+
+chmod +x /usr/sbin/niam
+
+Create an authorization file $HOME/.awsAuth
+
+This should contain a aws-user, aws id and secret key as follows:
+
+aws-user:aws-id:aws-key
+
+
+The defined aws-user should have certion permissions from IAM:
+
+master		ec2 read only permissions
+		S3 read permissions
+		SQS permissions
+
+client		S3 read permissions
+		SQS permissions
+
+Make the permissions safe - important or niam will complain
+
+chmod 0600 $HOME/.awsAuth
+
+
+Create an s3 bucket S3_BUCKET with the subdirectories
+
+conf
+scripts
+
+Conf directory
+--------------
+
+The conf directory should contain a file for each host that is a client or master, The 
+filename should be the same as the hostname and contain the role of the system as 
+either master or client
+
+i.e
+
+ROLE=master
+
+or 
+
+ROLE=client
+
+
+Scripts directory
+-----------------
+
+The scripts directory should contain two files (for now)
+
+The first is GetInstanceID
+
+#cat GetInstanceID
+#!/bin/bash
+
+USER=aws-user
+
+KEY=`grep ${USER} $HOME/.awsAuth | awk -F: '{ print $2 }'`
+PASSWORD=`grep ${USER} $HOME/.awsAuth | awk -F: '{ print $3 }'`
+
+export AWS_DEFAULT_REGION=eu-west-1
+export AWS_ACCESS_KEY_ID=$KEY
+export AWS_SECRET_ACCESS_KEY=$PASSWORD
+
+
+if [ ! -f $HOME/.awsAuth ]
+then
+	echo -n "ERROR-AUTH"
+fi
+
+if [ -f /sys/hypervisor/uuid ] && [ `head -c 3 /sys/hypervisor/uuid` == ec2 ]; then
+
+    INSTANCEID=`/usr/bin/curl -s http://169.254.169.254/latest/meta-data/instance-id | awk -F@ '{ print $1 }'`
+    echo -n ${INSTANCEID}
+else
+    echo -n NOT-AWS 
+fi
+
+
+and the second is DescribeInstances
+
+#cat DescribeInstances
+#!/bin/bash
+
+
+if [ ! -f $HOME/.awsAuth ]
+then
+	echo -n "ERROR-AUTH"
+fi
+
+USER=aws-user
+
+KEY=`grep ${USER} $HOME/.awsAuth | awk -F: '{ print $2 }'`
+PASSWORD=`grep ${USER} $HOME/.awsAuth | awk -F: '{ print $3 }'`
+
+export AWS_DEFAULT_REGION=eu-west-1
+export AWS_ACCESS_KEY_ID=$KEY
+export AWS_SECRET_ACCESS_KEY=$PASSWORD
+
+if [ -f /sys/hypervisor/uuid ] && [ `head -c 3 /sys/hypervisor/uuid` == ec2 ]; then
+
+    /usr/local/bin/aws --output json ec2 describe-instances
+else
+    echo -n NOT-AWS
+fi
+
+exit 0
+
+
+Running NIAM
+------------
+
+/usr/sbin/niam -s eu-west-1.queue.amazonaws.com -i aws-user  -e  s3-eu-west-1.amazonaws.com -b S3_BUCKET -q SQS_QUEUE  
+
+
+-s SQS endpoint 
+-i AWS user defined in $HOME/.awsAuth  
+-e S3 endpoint  
+-b Bucket name 
+-q SQS Queue name   
+
+
+The SQS Queue name will be created as required by niam
+
+
+Other switch are possible
+
+-f run in forground
+-d arg   , the egreater the arg the more the debug output 1-10. 10-20, 20-100
+-c force to be a client  - so you can test master and client from one system
+
+
+Log Files
+---------
+
+If you are running in forground then the output comes to the stdout. Otherwise log files are
+
+logs 	/var/log/niam/niam.log		
+alerts	/var/log/niam/alert.log
+
+Scripts
+-------
+
+niam will access the S3 bucket in the scripts directory and download the two named script above into
+the directory /etc/niam/scripts
+
+
+
+
+
+
+
+
+
+
+
+
+
