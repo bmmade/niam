@@ -22,18 +22,18 @@ and perform analysis of system which have been there and are suddenly missing.
 
 Phase 1:
 
-There are pre-defined messages which the client can send to the master
+Pre-defined PINGS sent over SQS which the client sends to the master
 
-1) PING
 
-The master will register a PING and will warn fo the PING has not been seen in the last
+The master will register a PING and will warn if the PING has not been seen in the last
 60 seconds. If the PING has not been seen for 600 seconds then the system is purged from the 
-list of systems and no firther warnings will be given.
+list of systems and no further warnings will be given.
 
+WE ARE HERE NOW !!!!!!
 
 Phase 2:
 
-Send alerts to a SNS endpoint
+Send alerts to an SNS endpoint
 
 
 Phase 3:
