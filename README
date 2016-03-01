@@ -73,6 +73,7 @@ The defined aws-user should have certion permissions from IAM:
 master		ec2 read only permissions
 		S3 read permissions
 		SQS permissions
+		SNS permissions
 
 client		S3 read permissions
 		SQS permissions
