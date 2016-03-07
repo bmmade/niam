@@ -8,17 +8,22 @@ Most monitoring systems require a number of ports opened from source to target.
 In the  (AWS) Amazon world we require a combination of Security groups, target 
 ports, VPC peering connections and routes.  Generally we need to open ICMP and 
 other ports from a monitoring server which is not neccessary to the good and 
-safe functionaing of the application. 
+safe functioning of the application. 
 
 What would be good is a non intrusive monitoring system in which not extra ports
 need be opened. Hence NIAM!
 
-There are a few things to perpare but this document attempts to guide you through
-it.
+There are a few things to prepare  to get it running but this document guides you 
+through it.
 
 *******************************************************************************
 
 We define a master AWS host which accepts messages from client AWS nodes via SQS.
+
+SQS is cheap as follows:
+	First 1 million Amazon SQS Requests per month are free
+	$0.50 per 1 million Amazon SQS Requests  per month thereafter ($0.00000050 per SQS Request)
+
 
 The master will also make its own checks via the aws decribe of visible instances
 and perform analysis of systems which have been there and are suddenly missing.
@@ -46,7 +51,8 @@ The SNS endpoint should already exist.
 
 See script "Alert"
 
-WE ARE HERE NOW !!!!!!
+
+WE ARE HERE NOW!!
 
 Phase 3:
 
@@ -65,7 +71,16 @@ Make a web inferface
 Installation
 ------------
 
-Download the binary and place in /usr/sbin
+Install an sql database somewhere. Of course on AWS this should be on RDS.
+On ubuntu this is  done using:
+
+sudo apt-get install mysql-server
+
+Install hping3 with
+
+	# apt-get install hping3
+
+Download the niam binary and place in /usr/sbin
 
 chmod +x /usr/sbin/niam
 
@@ -103,14 +118,22 @@ The conf directory should contain a file for each host that is a client or maste
 filename should be the same as the hostname and contain the role of the system as 
 either master or client
 
-i.e
+I fyou dont create a file equivelent to the hostname then it will look for a file called GENERIC. 
+If this is basically empty then the client will only send SQS pings to the master. This is good thing!
+
+It can contain the following statements:
+
 
 ROLE=master
-
-or 
-
+or
 ROLE=client
 
+DATABASE  database_host 3306  database user password
+
+PING $TARGET PORT $PORT
+(for icmp ping then use port 0)
+
+HTTP $TARGET PORT $PORT
 
 Scripts directory
 -----------------
@@ -228,9 +251,12 @@ The SQS Queue will be created as required by niam
 
 Other switches are possible
 
--f run in forground
--d arg   , the greater the arg the more the debug output 1-10, 10-20, 20-100
--c force to be a client  - so you can test master and client from one system
+-f               run in forground
+-d arg           the greater the arg the more the debug output 1-10, 10-20, 20-100
+-c               force to be a client  - so you can test master and client from one system
+-h $hostname     fix the hostname we are supposed to be coming from
+
+
 
 
 Log Files
@@ -247,4 +273,209 @@ Scripts
 niam will access the S3 bucket in the scripts directory and download the two named script above into
 the directory /etc/niam/scripts
 
+
+Running as service
+------------------
+
+The system daemonizes upon startup unless you use the -f flag. This seem to be required when
+running as a service.
+
+
+
+#!/bin/sh
+
+### BEGIN INIT INFO
+# Provides:          service-niam 
+# Required-Start:    $remote_fs $syslog
+# Required-Stop:     $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description:
+# Description:       no description given
+### END INIT INFO
+
+
+PATH=/sbin:/usr/sbin:/bin:/usr/bin
+export PATH
+
+name=niam
+program=/usr/sbin/niam
+
+args="-f -s eu-west-1.queue.amazonaws.com -q niam_sqs -i dbo-made -e s3-eu-west-1.amazonaws.com -b bem-niam" 
+
+
+pidfile="/var/run/$name.pid"
+
+[ -r /etc/default/$name ] && . /etc/default/$name
+[ -r /etc/sysconfig/$name ] && . /etc/sysconfig/$name
+
+trace() {
+  logger -t "/etc/init.d/service-niam" "$@"
+}
+
+emit() {
+  trace "$@"
+  echo "$@"
+}
+
+start() {
+
+    exec $program $args >> /var/log/niam/niam.log 2>> /var/log/niam/niam.log &
+
+
+    echo $! > $pidfile
+
+    emit "$name started"
+
+    return 0
+
+}
+
+stop() {
+  # Try a few times to kill TERM the program
+  if status ; then
+    pid=$(cat "$pidfile")
+    trace "Killing $name (pid $pid) with SIGTERM"
+    kill -TERM $pid
+    # Wait for it to exit.
+    for i in 1 2 3 4 5 ; do
+      trace "Waiting $name (pid $pid) to die..."
+      status || break
+      sleep 1
+    done
+    if status ; then
+      emit "$name stop failed; still running."
+    else
+      emit "$name stopped."
+    fi
+  fi
+}
+
+status() {
+  if [ -f "$pidfile" ] ; then
+    pid=$(cat "$pidfile")
+    if ps -p $pid > /dev/null 2> /dev/null ; then
+      # process by this pid is running.
+      # It may not be our pid, but that's what you get with just pidfiles.
+      # TODO(sissel): Check if this process seems to be the same as the one we
+      # expect. It'd be nice to use flock here, but flock uses fork, not exec,
+      # so it makes it quite awkward to use in this case.
+      return 0
+    else
+      return 2 # program is dead but pid file exists
+    fi
+  else
+    return 3 # program is not running
+  fi
+}
+
+force_stop() {
+  if status ; then
+    stop
+    status && kill -KILL $(cat "$pidfile")
+  fi
+}
+
+
+case "$1" in
+  force-start|start|stop|force-stop|restart)
+    trace "Attempting '$1' on service-niam"
+    ;;
+esac
+
+case "$1" in
+  force-start)
+    PRESTART=no
+    exec "$0" start
+    ;;
+  start)
+    status
+    code=$?
+    if [ $code -eq 0 ]; then
+      emit "$name is already running"
+      exit $code
+    else
+      start
+      exit $?
+    fi
+    ;;
+  stop) stop ;;
+  force-stop) force_stop ;;
+  status) 
+    status
+    code=$?
+    if [ $code -eq 0 ] ; then
+      emit "$name is running"
+    else
+      emit "$name is not running"
+    fi
+    exit $code
+    ;;
+  restart) 
+    
+    stop && start 
+    ;;
+  *)
+    echo "Usage: $SCRIPTNAME {start|force-start|stop|force-start|force-stop|status|restart}" >&2
+    exit 3
+  ;;
+esac
+
+exit $?
+
+
+
+
+
+Messages Sent by client to master
+---------------------------------
+
+$INSTANCE,$HOSTNAME, "PING", $TIME
+
+where
+
+$INSTANCE   is the aws install number or NOT-AWS
+$HOSTNAME   is the hostname of the Linux client
+PING	    identifier of the message
+$TIME	    result of time(). 
+            The time as the number of seconds since the Epoch, 1970-01-01 00:00:00 +0000
+
+
+$INSTANCE, $HOSTNAME, "LPING", $TARGET, $PORT,  $TIME, $STATUS
+
+where
+
+$INSTANCE   is the aws install number or NOT-AWS
+$HOSTNAME   is the hostname of the Linux client
+LPING	    identifier of the message
+$TARGET	    is the host a ping was attempted on
+$PORT	    the port that was pinged  (0 for ICMP)
+$TIME	    result of time(). 
+            The time as the number of seconds since the Epoch, 1970-01-01 00:00:00 +0000
+$STATUS	    0=OK or 1=FAILED
+
+
+
+$INSTANCE, $HOSTNAME, "HTTP", $TARGET, $PORT , $TIME, $STATUS
+
+where
+
+$INSTANCE   is the aws install number or NOT-AWS
+$HOSTNAME   is the hostname of the Linux client
+HTTP	    identifer of the message 
+$PORT	    the port that was pinged  
+$TARGET	    The URL 
+$STATUS	    0=OK or 1=FAILED
+
+
+$INSTANCE, $HOSTNAME, "SCRIPT", $SCRIPTNAME, $ARG, $TIME, $STATUS
+
+where
+
+$INSTANCE   is the aws install number or NOT-AWS
+$HOSTNAME   is the hostname of the Linux client
+SCRIPT	    identifer of the message 
+$SCRIPTNAME The  path of the script 
+$ARG 	    Argument to the script
+$STATUS	    0=OK or 1=FAILED
 
