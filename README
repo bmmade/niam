@@ -74,7 +74,15 @@ Installation
 Install an sql database somewhere. Of course on AWS this should be on RDS.
 On ubuntu this is  done using:
 
-sudo apt-get install mysql-server
+Intstall he aws cli. To do this see
+
+http://docs.aws.amazon.com/cli/latest/userguide/installing.html
+(in time the need for this will be removed)
+
+If you want to log to a sql server then install one locally or maybe use RDS.
+To do this locally do:
+
+	#sudo apt-get install mysql-server
 
 Install hping3 with
 
@@ -100,13 +108,14 @@ master		ec2 read only permissions
 
 client		S3 read permissions
 		SQS permissions
+		ec2 read only permissions
 
 Make the permissions safe - important or niam will complain
 
 chmod 0600 $HOME/.awsAuth
 
 
-Create an s3 bucket S3_BUCKET with the subdirectories
+Create an s3 bucket S3 BUCKET with the subdirectories
 
 conf
 scripts
@@ -118,18 +127,20 @@ The conf directory should contain a file for each host that is a client or maste
 filename should be the same as the hostname and contain the role of the system as 
 either master or client
 
-I fyou dont create a file equivelent to the hostname then it will look for a file called GENERIC. 
+If you dont create a file equivelent to the hostname then it will look for a file called GENERIC. 
 If this is basically empty then the client will only send SQS pings to the master. This is good thing!
 
 It can contain the following statements:
 
-
+(to define master or client)
 ROLE=master
 or
 ROLE=client
 
+(for logging to a databse)
 DATABASE  database_host 3306  database user password
 
+(for testing some endpoint)
 PING $TARGET PORT $PORT
 (for icmp ping then use port 0)
 
@@ -145,6 +156,8 @@ The first is GetInstanceID
 #cat GetInstanceID
 #!/bin/bash
 
+#You must configure your IAM user name here 
+#used by both master and slave to get instance id
 USER=aws-user
 
 KEY=`grep ${USER} $HOME/.awsAuth | awk -F: '{ print $2 }'`
